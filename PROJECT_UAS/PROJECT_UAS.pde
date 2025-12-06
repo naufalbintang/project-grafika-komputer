@@ -1,11 +1,3 @@
-import processing.sound.*; // 1. Import library
-
-// Variabel Sound
-SoundFile soundThrust;
-SoundFile soundCrash;
-SoundFile soundWin;
-
-
 int[] moon;
 int landingX = 0;
 PImage ship;
@@ -23,8 +15,6 @@ int state = WAITING;
 // Obstacle variables
 ArrayList<Obstacle> obstacles;
 PImage ufoImage;
-// List untuk menyimpan partikel ledakan
-ArrayList<Particle> particles = new ArrayList<Particle>();
 
 class Obstacle {
   PVector pos;
@@ -49,22 +39,6 @@ class Obstacle {
       velocity.y *= -1;
       pos.y = constrain(pos.y, 0, height - 50 - size.y);
     }
-    
-    // Di dalam void update()
-    // suara mesin thrust kata ai
-    if ( acc > 0 ) {
-      // Jika gas ditekan & suara belum bunyi, mainkan (looping)
-      if (!soundThrust.isPlaying()) {
-        soundThrust.loop();}
-    } else {
-      // Jika tidak digas, matikan suara
-      if (soundThrust.isPlaying()) {
-        soundThrust.stop();}
-    }
-    
-    // suara jatuh dan menang kata ai
-    
-    
   }
   
   void display() {
@@ -93,7 +67,7 @@ class Obstacle {
   
   boolean checkCollision(PVector shipPos) {
     // Cek collision dengan radius roket (sekitar 40 pixel)
-    float shipRadius = 30;
+    float shipRadius = 50;
     
     // Cari titik terdekat pada rectangle
     float closestX = constrain(shipPos.x, pos.x, pos.x + size.x);
@@ -109,7 +83,7 @@ class Obstacle {
 }
 
 void setup(){
-    size(800, 800);
+    size(1700, 800);
     moon = new int[width/10+1];
     for(int i = 0; i < moon.length; i++){
         moon[i] = int(random(10));
@@ -118,19 +92,7 @@ void setup(){
     ship = loadImage( "ROKET.png" );
     ufoImage = loadImage( "ufo.png" );  // Load gambar UFO
     reset();
-    
-     // 2. Load file suara
-    soundThrust = new SoundFile(this, "thrust.wav");
-    soundCrash = new SoundFile(this, "crash.mp3");
-    soundWin = new SoundFile(this, "win.mp3");
-    
-     // Atur volume jika perlu (0.0 sampai 1.0)
-    soundThrust.amp(0.5); 
-      
 }
-
-
-
 
 void reset() {
    moon = new int[width/10+1];
@@ -152,66 +114,13 @@ void reset() {
    for (int i = 0; i < numObstacles; i++) {
      float x = random(100, width - 150);
      float y = random(80, height - 150);
-     float w = 75;  // Ukuran sama untuk semua UFO
-     float h = 60;  // Ukuran sama untuk semua UFO
+     float w = 120;  // Ukuran sama untuk semua UFO
+     float h = 80;  // Ukuran sama untuk semua UFO
      float vx = random(-1, 1);
      float vy = random(-1, 1);
      obstacles.add(new Obstacle(x, y, w, h, vx, vy));
    }
 }
-
-////// kerjaan mecca //////
-// gw cobain dulu yeah meledakk
-void createExplosion(float x, float y) {
-  // Buat 50 kepingan partikel sekaligus
-  for (int i = 0; i < 50; i++) {
-    particles.add(new Particle(x, y));
-  }
-}
-
-// Panggil fungsi ini di dalam void draw() agar ledakan terlihat
-void runExplosion() {
-  for (int i = particles.size() - 1; i >= 0; i--) {
-    Particle p = particles.get(i);
-    p.update();
-    p.display();
-    if (p.isDead()) {
-      particles.remove(i);
-    }
-  }
-}
-
-// Class Partikel Ledakan
-class Particle {
-  PVector position;
-  PVector velocity;
-  float lifespan;
-  
-  Particle(float x, float y) {
-    position = new PVector(x, y);
-    // Kecepatan acak ke segala arah
-    velocity = PVector.random2D();
-    velocity.mult(random(2, 5)); 
-    lifespan = 255.0;
-  }
-  
-  void update() {
-    position.add(velocity);
-    lifespan -= 5.0; // Partikel perlahan menghilang
-  }
-  
-  void display() {
-    noStroke();
-    fill(255, 100, 0, lifespan); // Warna oranye api
-    ellipse(position.x, position.y, 8, 8);
-  }
-  
-  boolean isDead() {
-    return (lifespan < 0);
-  }
-}
-////// kerjaan mecca //////
-
 
 void draw(){
   background(255);
@@ -244,9 +153,6 @@ void draw(){
   else if ( state == CRASHED ) {
    drawCrashed();
   }
-  
-  // Tambahkan ini agar ledakan tetap terlihat meskipun status CRASHED
-  runExplosion();
 }
 
 void mousePressed() {
@@ -315,11 +221,6 @@ void update(){
     // Cek collision dengan roket
     if (obs.checkCollision(pos)) {
       state = CRASHED;
-      //nambahin sound qhaqha
-      soundThrust.stop(); // Matikan suara mesin
-      soundCrash.play();  // Mainkan suara ledakan sekali
-      createExplosion(pos.x, pos.y); // Panggil fungsi ledakan visual
-        
       speed = new PVector(0, 0);
       acc = 0;
       return; // Keluar dari update jika crash
@@ -331,15 +232,11 @@ void update(){
      pos.y = height - 50 - 75;
      speed = new PVector(0, 0); 
      state = FINISHED;
-     soundThrust.stop();
-     soundWin.play(); // Mainkan suara menang
      acc = 0;
   } else if (pos.y > height - 20 - 75 ) {
      pos.y = height - 20 - 75;
      speed = new PVector(0, 0); 
      state = CRASHED; // Ubah ke CRASHED karena mendarat di bulan
-     soundThrust.stop();
-     soundCrash.play(); // Mainkan suara hancur
      acc = 0;
   } 
 }
@@ -374,7 +271,7 @@ void drawShip() {
    fill(255, i*50, 20);
    ellipse( 0, 75, min(1, acc*10) * i*4, min(1, acc*10) * i*10); 
  }
- image( ship, -50, -50, 100, 100 ); 
+ image( ship, -75, -75, 150, 150 ); 
  popMatrix();
 }
 
