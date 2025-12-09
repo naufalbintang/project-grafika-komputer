@@ -1,450 +1,362 @@
-import processing.sound.*; // import library sound untuk menangani audio
+import processing.sound.*; 
+
+// ==========================================
+// --- BAGIAN 0: KONFIGURASI GAME (TWEAK) ---
+// ==========================================
+
+// 1. PENGATURAN VISUAL & UKURAN (BARU DI SINI)
+// ------------------------------------------------
+// Ukuran Roket
+float SHIP_W = 60;            // Lebar roket (Pixel)
+float SHIP_H = 60;            // Tinggi roket (Pixel)
+// Ukuran UFO
+float UFO_W = 75;             // Lebar UFO
+float UFO_H = 60;             // Tinggi UFO
+
+// 2. PENGATURAN KESULITAN & FISIKA
+// ------------------------------------------------
+int   TOTAL_UFO = 2;          // Jumlah UFO
+float UFO_MIN_SPEED = 0.25;    // Kecepatan min UFO
+float UFO_MAX_SPEED = 1.0;    // Kecepatan max UFO
+
+float GRAVITY_FORCE = 0.04;   // Gravitasi
+float THRUST_POWER = 0.15;    // Kekuatan mesin
+float ROTATION_SPEED = 0.1;   // Kecepatan putar
+float AIR_FRICTION = 0.5;     // Gesekan udara
+
+// 3. PENGATURAN AREA
+// ------------------------------------------------
+int   LANDING_PAD_W = 80;     // Lebar landasan pacu
+
+// --- HITBOX OTOMATIS (Jangan diubah jika bingung) ---
+// Radius tabrakan dihitung otomatis setengah dari lebar roket agar pas
+float SHIP_COLLISION_R = SHIP_W / 2.0; 
+
+// ==========================================
+// --- AKHIR KONFIGURASI --------------------
+// ==========================================
 
 // --- bagian 1: variabel global ---
-// variabel untuk file suara
-SoundFile soundThrust;
-SoundFile soundCrash;
-SoundFile soundWin;
+SoundFile soundThrust, soundCrash, soundWin;
+PImage ship, ufoImage; 
 
-// array untuk menyimpan bentuk permukaan bulan (terrain)
 int[] moon;
-// posisi x target pendaratan (landing pad)
 int landingX = 0;
+String crashMessage = ""; 
 
-PImage ship; // variabel untuk gambar roket
-
-// vektor posisi (pos) dan kecepatan (speed) roket
 PVector pos = new PVector( 150, 20 );
 PVector speed = new PVector( 0, 0 );
-
-// variabel fisika roket
-// g = gravitasi (menarik roket ke bawah)
-PVector g = new PVector( 0, 0.04 ); 
-// a = sudut rotasi roket (angle)
+PVector g = new PVector( 0, GRAVITY_FORCE ); 
 float a = 0; 
-// acc = akselerasi (tenaga dorong roket saat spasi ditekan)
 float acc = 0; 
 
-// --- bagian 2: status game (game state) ---
-// menggunakan angka untuk menandai status game saat ini
-int WAITING = 1;   // menunggu mulai
-int RUNNING = 2;   // sedang main
-int FINISHED = 3;  // menang (mendarat)
-int CRASHED = 4;   // kalah (tabrakan)
-int state = WAITING; // status awal adalah waiting
+// --- bagian 2: status game ---
+int WAITING = 1;   
+int RUNNING = 2;   
+int FINISHED = 3;  
+int CRASHED = 4;   
+int state = WAITING; 
 
 // --- bagian 3: variabel obstacle & partikel ---
-ArrayList<Obstacle> obstacles; // list untuk menyimpan banyak ufo
-PImage ufoImage; // gambar ufo
-ArrayList<Particle> particles = new ArrayList<Particle>(); // list untuk efek ledakan
+ArrayList<Obstacle> obstacles; 
+ArrayList<Particle> particles = new ArrayList<Particle>(); 
 
 // --- bagian 4: class obstacle (ufo) ---
 class Obstacle {
-  PVector pos;      // posisi ufo
-  PVector size;     // ukuran ufo (lebar, tinggi)
-  PVector velocity; // kecepatan gerak ufo
+  PVector pos;      
+  PVector size;     
+  PVector velocity; 
 
-  // constructor: fungsi untuk membuat ufo baru
   Obstacle(float x, float y, float w, float h, float vx, float vy) {
     pos = new PVector(x, y);
     size = new PVector(w, h);
     velocity = new PVector(vx, vy);
   }
   
-  // fungsi update: menggerakkan ufo
   void update() {
-    pos.add(velocity); // ubah posisi berdasarkan kecepatan
+    pos.add(velocity); 
 
-    // logika mantul (bounce):
-    // jika nabrak tembok kiri/kanan, balik arah x
     if (pos.x < 0 || pos.x + size.x > width) {
       velocity.x *= -1;
-      pos.x = constrain(pos.x, 0, width - size.x); // jaga agar tidak tembus
+      pos.x = constrain(pos.x, 0, width - size.x); 
     }
-    // jika nabrak atap/bawah, balik arah y
     if (pos.y < 0 || pos.y + size.y > height - 50) {
       velocity.y *= -1;
       pos.y = constrain(pos.y, 0, height - 50 - size.y);
     }
     
-    // logika suara thrust (mesin)
-    // dipasang di sini agar dicek terus menerus setiap frame
     if ( acc > 0 ) {
-      // jika gas ditekan & suara belum bunyi, mainkan (looping)
-      if (!soundThrust.isPlaying()) {
-        soundThrust.loop();
-      }
+      if (!soundThrust.isPlaying()) soundThrust.loop();
     } else {
-      // jika tidak digas, matikan suara
-      if (soundThrust.isPlaying()) {
-        soundThrust.stop();
-      }
+      if (soundThrust.isPlaying()) soundThrust.stop();
     }
   }
   
-  // fungsi display: menggambar ufo ke layar
   void display() {
     if (ufoImage != null) {
       imageMode(CENTER);
-      // gambar file ufo.png
+      // Menggunakan ukuran dari parameter UFO_W dan UFO_H
       image(ufoImage, pos.x + size.x/2, pos.y + size.y/2, size.x, size.y);
       imageMode(CORNER);
     } else {
-      // fallback: jika gambar tidak ada, gambar lingkaran merah (untuk debug)
       fill(255, 0, 0, 150);
       stroke(200, 0, 0);
-      strokeWeight(2);
       ellipse(pos.x + size.x/2, pos.y + size.y/2, size.x, size.y);
-      
-      // hiasan teks "ufo"
-      fill(255, 255, 0);
-      ellipse(pos.x + size.x/2, pos.y + size.y/2 - 10, size.x * 0.6, size.y * 0.4);
-      fill(0);
-      textAlign(CENTER);
-      textSize(16);
-      text("UFO", pos.x + size.x/2, pos.y + size.y/2 + 5);
-      strokeWeight(1);
+      fill(0); textAlign(CENTER); text("UFO", pos.x + size.x/2, pos.y + size.y/2);
     }
   }
   
-  // fungsi cek tabrakan (collision detection)
   boolean checkCollision(PVector shipPos) {
-    float shipRadius = 30; // anggap roket berbentuk lingkaran radius 30
-    
-    // cari titik terdekat pada kotak ufo terhadap pusat roket
     float closestX = constrain(shipPos.x, pos.x, pos.x + size.x);
     float closestY = constrain(shipPos.y, pos.y, pos.y + size.y);
     
-    // hitung jarak
     float distanceX = shipPos.x - closestX;
     float distanceY = shipPos.y - closestY;
     float distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
     
-    // jika jarak lebih kecil dari radius roket, berarti nabrak!
-    return distanceSquared < (shipRadius * shipRadius);
+    // Radius tabrakan kini dinamis mengikuti ukuran roket
+    return distanceSquared < (SHIP_COLLISION_R * SHIP_COLLISION_R);
   }
 }
 
-// --- bagian 5: setup (dijalankan sekali di awal) ---
+// --- bagian 5: setup ---
 void setup(){
-    size(800, 800); // ukuran layar
+    size(800, 800); 
     
-    // generate permukaan bulan secara acak
     moon = new int[width/10+1];
     for(int i = 0; i < moon.length; i++){
-        moon[i] = int(random(10)); // ketinggian acak
+        moon[i] = int(random(10)); 
     }
     
-    // tentukan lokasi landing pad secara acak
     landingX = int( random(3, moon.length-4))*10;
     
-    // load aset gambar
-    ship = loadImage( "ROKET.png" );
-    ufoImage = loadImage( "ufo.png" );
+    try {
+      ship = loadImage( "ROKET.png" );
+      ufoImage = loadImage( "ufo.png" );
+      soundThrust = new SoundFile(this, "thrust.wav");
+      soundCrash = new SoundFile(this, "crash.mp3");
+      soundWin = new SoundFile(this, "win.mp3");
+      soundThrust.amp(0.5);
+    } catch (Exception e) {
+      println("WARNING: File aset (gambar/suara) tidak ditemukan.");
+    }
     
-    // panggil fungsi reset untuk memulai variabel game
     reset();
-    
-    // load file suara
-    soundThrust = new SoundFile(this, "thrust.wav");
-    soundCrash = new SoundFile(this, "crash.mp3");
-    soundWin = new SoundFile(this, "win.mp3");
-    
-    soundThrust.amp(0.5); // atur volume suara mesin (50%)
 }
 
-// --- bagian 6: fungsi reset (mengulang game) ---
+// --- bagian 6: fungsi reset ---
 void reset() {
-   // acak ulang permukaan bulan
-   moon = new int[width/10+1];
-   for ( int i=0; i < moon.length; i++) {
-       moon[i] = int(random(10));
-   }
+   for ( int i=0; i < moon.length; i++) moon[i] = int(random(10));
    landingX = int( random(3, moon.length-4))*10;
   
-   // reset posisi roket ke atas
    pos = new PVector( 150, 20 );
-   a = 0;      // reset sudut
-   acc = 0;    // reset gas
-   speed = new PVector(0, 0); // reset kecepatan
+   a = 0;      
+   acc = 0;    
+   speed = new PVector(0, 0); 
+   crashMessage = ""; 
    
-   // reset dan buat obstacles (ufo) baru
    obstacles = new ArrayList<Obstacle>();
-   int numObstacles = int(random(3, 6)); // jumlah ufo acak 3-6 biji
    
-   for (int i = 0; i < numObstacles; i++) {
-     // posisi acak ufo
+   for (int i = 0; i < TOTAL_UFO; i++) {
      float x = random(100, width - 150);
      float y = random(80, height - 150);
-     float w = 75; // lebar ufo
-     float h = 60; // tinggi ufo
-     // kecepatan acak ufo
-     float vx = random(-1, 1);
-     float vy = random(-1, 1);
+     float vx = random(UFO_MIN_SPEED, UFO_MAX_SPEED);
+     float vy = random(UFO_MIN_SPEED, UFO_MAX_SPEED);
+     if(random(1) > 0.5) vx *= -1;
+     if(random(1) > 0.5) vy *= -1;
      
-     obstacles.add(new Obstacle(x, y, w, h, vx, vy));
+     // Menggunakan parameter global UFO_W dan UFO_H
+     obstacles.add(new Obstacle(x, y, UFO_W, UFO_H, vx, vy));
    }
 }
 
-// --- bagian 7: sistem partikel (ledakan) ---
-// fungsi untuk memicu ledakan di koordinat (x, y)
+// --- bagian 7: partikel ledakan ---
 void createExplosion(float x, float y) {
-  // buat 50 partikel sekaligus
-  for (int i = 0; i < 50; i++) {
-    particles.add(new Particle(x, y));
-  }
+  for (int i = 0; i < 50; i++) particles.add(new Particle(x, y));
 }
 
-// fungsi untuk menjalankan animasi ledakan setiap frame
 void runExplosion() {
   for (int i = particles.size() - 1; i >= 0; i--) {
     Particle p = particles.get(i);
-    p.update();
-    p.display();
-    // jika partikel sudah mati (transparan), hapus dari memori
-    if (p.isDead()) {
-      particles.remove(i);
-    }
+    p.update(); p.display();
+    if (p.isDead()) particles.remove(i);
   }
 }
 
-// class particle (satu butir api ledakan)
 class Particle {
-  PVector position;
-  PVector velocity;
-  float lifespan; // umur partikel (untuk transparansi)
-
+  PVector position; PVector velocity; float lifespan;
   Particle(float x, float y) {
     position = new PVector(x, y);
-    velocity = PVector.random2D(); // arah acak
-    velocity.mult(random(2, 5));   // kecepatan sebar
-    lifespan = 255.0; // mulai dari solid (tidak transparan)
+    velocity = PVector.random2D();
+    velocity.mult(random(2, 5));   
+    lifespan = 255.0; 
   }
-  
-  void update() {
-    position.add(velocity);
-    lifespan -= 5.0; // kurangi umur perlahan (fading out)
-  }
-  
-  void display() {
-    noStroke();
-    fill(255, 100, 0, lifespan); // warna oranye api dengan alpha (transparansi)
-    ellipse(position.x, position.y, 8, 8);
-  }
-  
-  boolean isDead() {
-    return (lifespan < 0); // mati jika lifespan habis
-  }
+  void update() { position.add(velocity); lifespan -= 5.0; }
+  void display() { noStroke(); fill(255, 100, 0, lifespan); ellipse(position.x, position.y, 8, 8); }
+  boolean isDead() { return (lifespan < 0); }
 }
 
-// --- bagian 8: draw (looping utama) ---
+// --- bagian 8: draw loop ---
 void draw(){
-  background(255); // hapus layar jadi putih
+  background(255); 
   
-  // gambar grid (garis bantu latar belakang)
   stroke(200, 200, 255);
-  for(int i = 0; i<height/10; i++){
-    line( 0, i*10, width, i*10);
-  }
-  for ( int i=0; i<width/10; i++) {
-   line( i*10, 0, i*10, height );
-  }
+  for(int i = 0; i<height/10; i++) line( 0, i*10, width, i*10);
+  for ( int i=0; i<width/10; i++) line( i*10, 0, i*10, height );
   
-  drawMoon();        // gambar tanah
-  drawLandingZone(); // gambar tempat mendarat
+  drawMoon();        
+  drawLandingZone(); 
   
-  // gambar semua obstacles (ufo)
-  for (Obstacle obs : obstacles) {
-    obs.display();
-  }
+  for (Obstacle obs : obstacles) obs.display();
   
-  drawShip(); // gambar roket
+  drawShip(); 
   
-  // cek status game untuk menentukan apa yang dilakukan
-  if ( state == WAITING ) {
-     drawWaiting(); // tampilkan layar tunggu
-  }
-  else if ( state == RUNNING ) {
-     update();      // jalankan fisika game
-  }
-  else if ( state == FINISHED ) {
-     drawFinished(); // tampilkan layar menang
-  }
-  else if ( state == CRASHED ) {
-     drawCrashed();  // tampilkan layar kalah
-  }
+  if ( state == WAITING ) drawWaiting();
+  else if ( state == RUNNING ) update();      
+  else if ( state == FINISHED ) drawFinished();
+  else if ( state == CRASHED ) drawCrashed();
   
-  // jalankan animasi ledakan (tetap jalan meski game over)
   runExplosion();
 }
 
 // --- bagian 9: input mouse ---
 void mousePressed() {
- if ( state == WAITING ) {
-   state = RUNNING; // klik untuk mulai
- } else if ( state == FINISHED || state == CRASHED ) {
-   reset();         // klik untuk restart jika sudah selesai
-   state = RUNNING;
+ if ( state == WAITING ) state = RUNNING;
+ else if ( state == FINISHED || state == CRASHED ) {
+   reset(); state = RUNNING;
  }
 }
 
-// --- bagian 10: fungsi gambar ui (teks) ---
+// --- bagian 10: UI Teks ---
 void drawWaiting() {
- textAlign( CENTER );
- fill(0);
- textSize(20); 
- text( "Click mouse to start", width/2, height/2);
- textSize(16);
- text( "Avoid the UFOs!", width/2, height/2 + 30);
+ textAlign( CENTER ); fill(0);
+ textSize(20); text( "Click mouse to start", width/2, height/2);
+ textSize(16); text( "Hindari " + TOTAL_UFO + " UFO dan mendaratlah!", width/2, height/2 + 30);
 }
 
 void drawFinished() {
- textAlign( CENTER );
- fill( 0 );
- textSize(20);
- // cek apakah mendarat tepat di landing zone?
- if ( pos.x > landingX - 40 && pos.x < landingX + 40 ) {
-   fill(0, 200, 0);
-   text( "YOU LANDED THE SHIP!", width/2, height/2);
-   fill(0);
-   text( "SUCCESS!", width/2, height/2 - 30);
+ textAlign( CENTER ); fill( 0 ); textSize(20);
+ if ( pos.x > landingX - LANDING_PAD_W/2 && pos.x < landingX + LANDING_PAD_W/2 ) {
+   fill(0, 200, 0); text( "YOU LANDED THE SHIP!", width/2, height/2);
+   fill(0); text( "SUCCESS!", width/2, height/2 - 30);
  } else {
-   fill(255, 100, 0);
-   text( "YOU MISSED THE PLATFORM!", width/2, height/2);
+   fill(255, 100, 0); text( "YOU MISSED THE PLATFORM!", width/2, height/2);
  }
- fill(0);
- text( "click to restart", width/2, height/2 + 30);
+ fill(0); text( "click to restart", width/2, height/2 + 30);
 }
 
 void drawCrashed() {
  textAlign( CENTER );
- fill(255, 0, 0);
- textSize(30);
- text( "CRASHED!", width/2, height/2 - 20);
- fill(0);
- textSize(20);
- text( "You hit a UFO!", width/2, height/2 + 20);
+ fill(255, 0, 0); textSize(30);
+ text( "CRASHED!", width/2, height/2 - 30);
+ fill(0); textSize(20);
+ text(crashMessage, width/2, height/2 + 10);
  text( "click to restart", width/2, height/2 + 50);
 }
 
-// --- bagian 11: update (logika utama game) ---
+// --- bagian 11: Logic Update ---
 void update(){
-  // hitung vektor gaya dorong (f) berdasarkan sudut (a) dan gas (acc)
-  // -acc karena y ke atas di processing itu negatif
   PVector f = new PVector( cos( a+PI/2 ) * -acc, sin( a+PI/2 ) * -acc );
   
-  // kurangi gas perlahan (friksi udara imajiner)
   if ( acc > 0 ) {
-    acc *= 0.5;
-    if(acc < 0.001){
-      acc = 0;
-    }
+    acc *= AIR_FRICTION;
+    if(acc < 0.001) acc = 0;
   }
   
-  speed.add( g ); // tambah gravitasi
-  speed.add( f ); // tambah dorongan mesin
-  pos.add( speed ); // pindahkan posisi roket
+  speed.add( g ); 
+  speed.add( f ); 
+  pos.add( speed ); 
   
-  // cek tabrakan dengan ufo
+  // 1. Cek Tabrakan UFO
   for (Obstacle obs : obstacles) {
-    obs.update(); // gerakkan ufo sekalian
-    
+    obs.update(); 
     if (obs.checkCollision(pos)) {
       state = CRASHED;
-      
-      soundThrust.stop(); // matikan suara mesin
-      soundCrash.play();  // mainkan suara ledakan
-      createExplosion(pos.x, pos.y); // visual ledakan
-        
-      speed = new PVector(0, 0); // hentikan roket
-      acc = 0;
-      return; // langsung keluar dari fungsi update
+      crashMessage = "Tertabrak Pesawat Alien (UFO)!"; 
+      triggerCrashEffect();
+      return; 
     }
   }
   
-  // cek pendaratan (landing)
-  // syarat: posisi x pas di zona landing dan posisi y menyentuh tanah
-  if ( pos.x > landingX - 40 && pos.x < landingX + 40 && pos.y > height - 50 - 75 ) { 
-     pos.y = height - 50 - 75; // "snap" posisi ke tanah agar tidak tembus
-     speed = new PVector(0, 0); 
-     state = FINISHED;
-     
-     soundThrust.stop();
-     soundWin.play(); // suara menang
-     acc = 0;
-  } 
-  // jika menyentuh tanah tapi bukan di zona landing (crash di bulan)
-  else if (pos.y > height - 20 - 75 ) {
-     pos.y = height - 20 - 75;
-     speed = new PVector(0, 0); 
-     state = CRASHED; 
-     
-     soundThrust.stop();
-     soundCrash.play(); 
-     acc = 0;
-  } 
+  // 2. Cek Pendaratan vs Tabrakan Tanah
+  // Logika ketinggian disesuaikan dengan tinggi roket (SHIP_H)
+  if (pos.y > height - 50 - SHIP_H/2) { // Jarak aman kaki roket
+      
+      // Cek apakah horizontal (x) berada di dalam area landing pad?
+      if ( pos.x > landingX - LANDING_PAD_W/2 && pos.x < landingX + LANDING_PAD_W/2 ) { 
+         pos.y = height - 50 - SHIP_H/2; 
+         speed = new PVector(0, 0); 
+         state = FINISHED;
+         if (soundThrust != null) soundThrust.stop();
+         if (soundWin != null) soundWin.play(); 
+         acc = 0;
+      } 
+      // GAGAL
+      else if (pos.y > height - 20 - SHIP_H/2 ) {
+         pos.y = height - 20 - SHIP_H/2;
+         speed = new PVector(0, 0); 
+         state = CRASHED; 
+         crashMessage = "Menabrak Permukaan Bulan!"; 
+         triggerCrashEffect();
+         acc = 0;
+      }
+  }
 }
 
-// --- bagian 12: menggambar elemen visual ---
+void triggerCrashEffect() {
+   if (soundThrust != null) soundThrust.stop();
+   if (soundCrash != null) soundCrash.play();  
+   createExplosion(pos.x, pos.y); 
+   speed = new PVector(0, 0); 
+   acc = 0;
+}
+
+// --- bagian 12: Visual ---
 void drawMoon() {
-   stroke(0);
-   fill(255, 200, 0, 60); // warna kuning transparan
-   beginShape();
-   vertex(0, height);
-   // gambar vertex (titik) sesuai array moon
-   for ( int i=0; i < moon.length; i++) {
-       vertex( i * 10, height - 20 - moon[i] );
-   }
-   vertex(width, height);
-   endShape(CLOSE);
+   stroke(0); fill(255, 200, 0, 60); 
+   beginShape(); vertex(0, height);
+   for ( int i=0; i < moon.length; i++) vertex( i * 10, height - 20 - moon[i] );
+   vertex(width, height); endShape(CLOSE);
 }
 
 void drawLandingZone() {
    fill(128, 200);
-   rect( landingX - 30, height - 50, 60, 10); // gambar kotak landing pad
-   // kaki-kaki landing pad
+   // Menggunakan parameter LANDING_PAD_W
+   rect( landingX - LANDING_PAD_W/2, height - 50, LANDING_PAD_W, 10); 
    line( landingX - 30, height - 20 - moon[landingX/10-3], landingX - 20, height - 40 );
    line( landingX + 30, height - 20 - moon[landingX/10 +3], landingX + 20, height - 40 );
 }
 
 void drawShip() {
- pushMatrix(); // simpan koordinat asal
- translate(pos.x, pos.y); // pindahkan titik nol ke posisi roket
- rotate(a); // putar sesuai sudut roket
- noFill();
+ pushMatrix(); translate(pos.x, pos.y); rotate(a); noFill();
  
- // animasi api roket (hanya digambar jika ada akselerasi)
+ // Efek api mengikuti ukuran roket
  for ( int i=4; i >= 0; i--) {
-   stroke(255, i*50, 0);
-   fill(255, i*50, 20);
-   // ukuran api tergantung besarnya 'acc'
-   ellipse( 0, 75, min(1, acc*10) * i*4, min(1, acc*10) * i*10);
+   stroke(255, i*50, 0); fill(255, i*50, 20);
+   // Api digambar sedikit di bawah roket (+SHIP_H/2)
+   ellipse( 0, SHIP_H/2 + 25, min(1, acc*10) * i*4, min(1, acc*10) * i*10);
  }
  
- image( ship, -50, -50, 100, 100 ); // gambar roket di tengah (0,0 relatif)
- popMatrix(); // kembalikan koordinat normal
+ if (ship != null) {
+   // MENGGUNAKAN PARAMETER SHIP_W dan SHIP_H
+   // -SHIP_W/2 agar gambar tepat di tengah (centered)
+   image( ship, -SHIP_W/2, -SHIP_H/2, SHIP_W, SHIP_H );
+ }
+ popMatrix(); 
 }
 
-// --- bagian 13: input keyboard ---
+// --- bagian 13: Input Keyboard ---
 void keyPressed() {
- if ( keyCode == LEFT ) {
-   a -= 0.1; // putar kiri
- }
- if ( keyCode == RIGHT ) {
-   a += 0.1; // putar kanan
- }
+ if ( keyCode == LEFT ) a -= ROTATION_SPEED;
+ if ( keyCode == RIGHT ) a += ROTATION_SPEED;
  if ( keyCode == UP ) {
-   acc += 0.15; // tambah gas
-   acc = min( acc, 1.0); // batasi gas maksimal 1.0
+   acc += THRUST_POWER;
+   acc = min( acc, 1.0); 
  }
- 
- // tombol spasi untuk mulai/restart
  if (keyCode == ' '){
-     if ( state == WAITING ) {
-       state = RUNNING;
-     } else if ( state == FINISHED || state == CRASHED ) {
-       reset();
-       state = RUNNING;
+     if ( state == WAITING ) state = RUNNING;
+     else if ( state == FINISHED || state == CRASHED ) {
+       reset(); state = RUNNING;
    }
  }
 }
