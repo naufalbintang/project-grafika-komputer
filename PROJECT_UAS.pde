@@ -7,8 +7,8 @@ import processing.sound.*;
 // 1. PENGATURAN VISUAL & UKURAN (BARU DI SINI)
 // ------------------------------------------------
 // Ukuran Roket
-float SHIP_W = 60;            // Lebar roket (Pixel)
-float SHIP_H = 60;            // Tinggi roket (Pixel)
+float SHIP_W = 100;            // Lebar roket (Pixel)
+float SHIP_H = 100;            // Tinggi roket (Pixel)
 // Ukuran UFO
 float UFO_W = 75;             // Lebar UFO
 float UFO_H = 60;             // Tinggi UFO
@@ -30,7 +30,7 @@ int   LANDING_PAD_W = 80;     // Lebar landasan pacu
 
 // --- HITBOX OTOMATIS (Jangan diubah jika bingung) ---
 // Radius tabrakan dihitung otomatis setengah dari lebar roket agar pas
-float SHIP_COLLISION_R = SHIP_W / 2.0; 
+float SHIP_COLLISION_R = SHIP_W * 0.20; 
 
 // ==========================================
 // --- AKHIR KONFIGURASI --------------------
