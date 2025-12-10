@@ -37,6 +37,7 @@ float SHIP_COLLISION_R = SHIP_W * 0.20;
 // ==========================================
 
 // --- bagian 1: variabel global ---
+// [SOUND] Deklarasi variabel untuk menampung file suara
 SoundFile soundThrust, soundCrash, soundWin;
 PImage ship, ufoImage; 
 
@@ -85,6 +86,8 @@ class Obstacle {
       pos.y = constrain(pos.y, 0, height - 50 - size.y);
     }
     
+    // [SOUND] --- LOGIKA SUARA MESIN ROKET ---
+    // Di sini dicek apakah variabel 'acc' (akselerasi) lebih besar dari 0?
     if ( acc > 0 ) {
       if (!soundThrust.isPlaying()) soundThrust.loop();
     } else {
