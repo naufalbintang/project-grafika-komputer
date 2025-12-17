@@ -12,7 +12,7 @@ float UFO_H = 60;             // Tinggi UFO
 float SHIP_COLLISION_R = SHIP_W * 0.20; // Radius tabrakan (Hitbox)
 
 // 2. PENGATURAN KESULITAN & FISIKA
-int   TOTAL_UFO = 2;          // Jumlah UFO
+int   TOTAL_UFO = 3;          // Jumlah UFO
 float UFO_MIN_SPEED = 0.25;    // Kecepatan min UFO
 float UFO_MAX_SPEED = 1.0;    // Kecepatan max UFO
 
@@ -251,20 +251,20 @@ void update(){
   float halfH = SHIP_H / 2;
 
   // Cek Batas Kiri
-  if (pos.x < halfW) {
-    pos.x = halfW;
-    speed.x = 0; // Hentikan pergerakan horizontal
-  }
+  //if (pos.x < halfW) {
+  //  pos.x = halfW;
+  //  speed.x = 0; // Hentikan pergerakan horizontal
+  //}
   // Cek Batas Kanan
-  if (pos.x > width - halfW) {
-    pos.x = width - halfW;
-    speed.x = 0; // Hentikan pergerakan horizontal
-  }
+  //if (pos.x > width - halfW) {
+  //  pos.x = width - halfW;
+  //  speed.x = 0; // Hentikan pergerakan horizontal
+  //}
   // Cek Batas Atas (Jika roket menyentuh batas atas, anggap crash ringan)
-  if (pos.y < halfH) {
-    pos.y = halfH;
-    speed.y = 0; // Hentikan pergerakan vertikal
-  }
+  //if (pos.y < halfH) {
+  //  pos.y = halfH;
+  //  speed.y = 0; // Hentikan pergerakan vertikal
+  //}
   // Catatan: Batas bawah sudah dicakup oleh Cek Pendaratan
 }
 
